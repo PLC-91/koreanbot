@@ -1,101 +1,50 @@
 import discord
-from discord.ext import commands
-from discord.utils import get
-import os
-import random
+import time
+from discord import app_commands
 
-TOKEN = 'MTA3Njc2NzMxMTI0MDg5MjQ1Nw.G6MXH7.jbKirCTIpTM2lEXGSxH-_WcSzPBCBszAacV5Sg'
+class MyClient(discord.Client):
+    def __init__(self):
+        super().__init__(intents = discord.Intents.default())
+        self.synced = False
 
-intents = discord.Intents.all()
-bot = commands.Bot(command_prefix='/', intents=intents)
+    async def on_ready(self):
+        await self.wait_until_ready()
+        if not self.synced: 
+            await tree.sync() 
+            self.synced = True
+        print(f'{self.user}이 시작되었습니다') 
+        game = discord.Game('테스트용 봇 동작중')   
+        await self.change_presence(status=discord.Status.online, activity=game)
 
+client = MyClient()
+tree = app_commands.CommandTree(client)
 
-@bot.event
-async def on_ready():
-    print('=====================================')
-    print(f'로딩되었습니다. 계정정보: {bot.user}')
-    print('이제 봇을 사용할 수 있습니다.')
-    print('=====================================')
+@tree.command(name="안녕", description='봇의 답장은?') 
+async def slash2(ctx: discord.Interaction):
+    await ctx.response.send_message(f"..(없음)") 
 
+@tree.command(name="유저정보", description='사용자의 정보를 수집합니다(개발중)')
+async def on_message(ctx: discord.Interaction, target: discord.Member):
+    user_server_joined_at = int(time.mktime(ctx.user.joined_at.timetuple())) # 코드가 더럽긴 하지만 ㄱㅊ
+    user_account_created_at = int(time.mktime(ctx.user.created_at.timetuple())) # ㅅㅂ
 
-@bot.command()
-async def updown(ctx):
-    answer = random.randint(1, 100)
-    await ctx.send('1부터 100 사이의 숫자를 맞춰보세요.')
+    embed = discord.Embed(title="+++ 유저 정보 +++", color=ctx.user.color)
+    embed.add_field(name="유저 ID ", value=f"`{ctx.user.id}`", inline=False)
+    embed.add_field(name="별명", value=ctx.user.display_name, inline=False)
+    embed.add_field(name="서버 가입 날짜", value=f"<t:{user_server_joined_at}> [<t:{user_server_joined_at}:R>]", inline=False)
+    embed.add_field(name="계정 생성 날짜", value=f"<t:{user_account_created_at}> [<t:{user_account_created_at}:R>]", inline=False)
+    embed.set_footer(text=f"{ctx.user.name}#{ctx.user.discriminator}", icon_url=ctx.user.avatar.url)
+    embed.set_thumbnail(url=ctx.user.avatar.url)
+    await ctx.response.send_message(embed=embed)
 
-    while True:
-        msg = await bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel)
-        try:
-            guess = int(msg.content)
-        except ValueError:
-            await ctx.send('올바른 숫자를 입력해주세요.')
-            continue
-
-        if guess == answer:
-            await ctx.send('정답입니다!')
-            break
-        elif guess < answer:
-            await ctx.send('Up')
-        else:
-            await ctx.send('Down')
-
-
-@bot.event
-async def on_message(message):
-    if message.author == bot.user or not isinstance(message.channel, discord.DMChannel):
-        return
-
-    if message.content.startswith('/봇공지 '):
-        content = message.content[6:]
-        channel_id = 1077840570535383040
-        channel = bot.get_channel(channel_id)
-        await channel.send(content)
-
-
-@bot.command()
-async def 안녕(ctx):
-    await ctx.reply('안녕')
-
-
-@bot.command()
-async def 잘가(ctx):
-    await ctx.reply('그래 나중에 보자')
-
-
-@bot.command()
-async def 봇정보(ctx):
-    latency = bot.latency * 1000  
-    embed = discord.Embed(
-        title='퐁! 🏓',
-        description=f'지연 시간: **{latency:.2f}ms**',
-        color=discord.Color.blue()
-    )
-    await ctx.send(embed=embed)
-
-
-@bot.command()
-async def 음악시작(ctx, *, filename):
-    if not ctx.message.author.voice:
-        await ctx.send("음성 채널에 먼저 들어가 주세요.")
-        return
-
-    channel = ctx.message.author.voice.channel
-    voice = get(bot.voice_clients, guild=ctx.guild)
-
-    if voice and voice.is_connected():
-        await voice.move_to(channel)
+@tree.command(name="계산")
+async def calc(ctx: discord.Interaction, expr: str):
+    try:
+        display = expr.replace("**", "^").replace("x", "×").replace("곱하기", "×").replace("나누기", "÷").replace("/", "÷").replace("**", "^").replace("%", "의 나머지").replace("//", "의 몫").replace("*", "×")
+        result = eval(expr.replace("x", "*").replace("^", "**"))
+    except:
+        await ctx.response.send_message(f"**{display}** 을(를) 계산하는 과정에서 알 수 없는 오류가 발생했습니다.", ephemeral=True)
     else:
-        voice = await channel.connect()
+        await ctx.response.send_message(f"**{display}** 은(는) **{result}** 입니다.", ephemeral=True)
 
-    music_folder = "A:/Town.py/음악"
-    filepath = os.path.join(music_folder, filename)
-    if not os.path.exists(filepath):
-        await ctx.send(f"{filename} 파일이 존재하지 않습니다.")
-        return
-
-    source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(filepath))
-    voice.play(source)
-    voice.is_playing()
-
-
-bot.run(TOKEN)
+client.run('')
